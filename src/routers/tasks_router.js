@@ -27,12 +27,38 @@ taskRouter.post('/tasks',authMiddleware, async (req,res)=>{
 })
 
 //get all tasks
+//fliter by completed === true or false,
+//options: {limit,skip,sort:{createdAt}}  createdAt:-1 is descending and createdAt:1 is ascending
 taskRouter.get('/tasks',authMiddleware,async (req,res)=>{
-
+   let completed;
+   const sort = {};
+   if(req.query.completed){
+     completed = req.query.completed;
+   }
+   if (req.query.sortBy) {
+       const parts = req.query.sortBy.split(':');
+       sort[parts[0]] = parts[1] === 'desc'? -1:1
+   }
+   
+   let allTasks;
     try {
         console.log(req.user.id);
-        
-        const allTasks = await Task.find({ owner:req.user.id });
+        if (completed) {
+             allTasks = await Task.find({ owner:req.user.id, completed },null,
+                                            {
+                                                limit:parseInt(req.query.limit),
+                                                skip:parseInt(req.query.skip),
+                                                sort
+                                            });    
+        }else{
+             allTasks = await Task.find({ owner:req.user.id},null,
+                                          {
+                                            limit:parseInt(req.query.limit),
+                                            skip:parseInt(req.query.skip),
+                                            sort
+                                          });
+        }
+
         //OR
         // await req.user.populate('userTasks').execPopulate();
 

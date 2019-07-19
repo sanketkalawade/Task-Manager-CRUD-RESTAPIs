@@ -4,7 +4,7 @@ const taskRouter = require('./routers/tasks_router');
 require('./db/mongoose') // we dont need anything from this but in this file our app connects to mongodb so we only require it for connection.
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 
 // app.use((req,res,next)=>{
 //     res.status(503).send("This site is under construction!!")

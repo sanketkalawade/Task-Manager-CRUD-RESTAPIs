@@ -48,31 +48,36 @@ const userSchema = new mongoose.Schema({
             type:String,
             required:true
         }
-    }]
+    }],
+    avatar:{
+        type: Buffer
+    }
+},{
+    timestamps:true
 })
 
+//before sending response convert 
 userSchema.methods.toJSON = function () {
     const user = this
     const userObject = user.toObject();
-
+    
+  //password, tokens array, avatar will not be shown in response
     delete userObject.password;
     delete userObject.tokens;
-
+    delete userObject.avatar;
     return userObject;
 }
 
 userSchema.methods.generateAuthToken = async function () {
     const user = this;
-    const token = jwt.sign({ _id:user._id.toString() }, 'this_is_secrete_key', { expiresIn:'7 days' });
+    const token = jwt.sign({ _id:user._id.toString() }, process.env.JWT_SECRET_KEY, { expiresIn:'7 days' });
     user.tokens = user.tokens.concat({token})
     await user.save()
     return token;
 }
 
 userSchema.statics.fetchUserBycredentials = async (email,password) =>{
-    const user = await User.findOne({email});
-    console.log(user);
-    
+    const user = await User.findOne({email});    
     if (!user) {
         throw new Error('User not found');
     }

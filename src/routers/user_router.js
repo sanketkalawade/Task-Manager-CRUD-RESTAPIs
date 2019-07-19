@@ -2,7 +2,9 @@ const express = require('express')
 const User = require('../models/userModel');
 const userRouter = new express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
-
+const multer = require('multer');
+const sharp = require('sharp');
+const {sendWelcomeMail,sendAccountRemovedMail} = require('../emails/user_accounts');
 //users rest apis
 
 //user login api
@@ -27,7 +29,9 @@ userRouter.post('/users',async (req,res)=>{
     try {
         const result = await user.save();
         const token = await user.generateAuthToken();
-        res.status(201).send({result, token})     
+        sendWelcomeMail(user) //we can use await but there is no need to send response before sending email 
+                              //i.e sendWelcomeMail returns promise.
+        res.status(201).send({result, token});     
     } catch (error) {
         res.status(500).send(error)
     }
@@ -140,6 +144,7 @@ userRouter.delete('/users/deleteme',authMiddleware, async (req,res)=>{
         //     return res.status(404).send("No such user available to delete")
         // }
         await req.user.remove();
+        sendAccountRemovedMail(req.user)
         res.send(req.user)
     } catch (error) {
         res.status(500).send(error.message)
@@ -171,6 +176,54 @@ userRouter.post('/users/logoutall',authMiddleware, async (req,res)=>{
     } catch (error) {
         res.status(500).send()
     }
+})
+
+const upload = multer({
+    //dest:'avatars', --> removing this bcz we dont want to save images to avatars folder. we want to save it to server side.
+    limits:{
+        fileSize:1000000 //1mb
+    },
+    fileFilter(req,file,callback){
+        // if (file.originalname.endsWith('.jpg') || file.originalname.endsWith('.png') || file.originalname.endsWith('.jpeg')) {
+        //     return callback(undefined,true)
+        // }
+
+        //OR you can do by using regex
+        if (!file.originalname.match(/\.(png|jpg|jpeg)$/)) {
+            callback(new Error('file should be of jpg or png or jpeg type'),undefined);
+        }
+        return callback(undefined,true)
+    }
+})
+
+//upload profile image
+userRouter.post('/users/me/avatar',authMiddleware, upload.single('avatar'), async (req,res)=>{
+   const buffer = await sharp(req.file.buffer).resize({width:250, height:250}).png().toBuffer();
+   req.user.avatar = buffer;
+    await req.user.save();
+    res.send('avatar uploaded successfully!')
+},(error,req,res,next)=>{
+    res.status(400).send({error: error.message})
+})
+
+//delete profile image
+userRouter.delete('/users/me/avatar',authMiddleware,async(req,res)=>{
+    req.user.avatar = undefined;
+    await req.user.save();
+    res.send();
+})
+
+//fetch profile image
+userRouter.get('/users/:id/avatar',async (req,res)=>{
+   try {
+    const user = await User.findById(req.params.id);
+    if (!user || !user.avatar) {
+        throw new Error()
+    }       
+    res.set('Content-Type','image/png').send(user.avatar)
+   } catch (error) {
+       res.status(404).send(error.message)
+   }
 })
 
 module.exports = userRouter;
